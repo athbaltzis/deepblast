@@ -1,0 +1,10 @@
+#!/usr/bin/env python
+***************deepblast.tc_method*********
+EXECUTABLE	run_deepblast.py
+ALN_MODE	pairwise
+IN_FLAG		-i=
+OUT_FLAG	-o=
+OUT_MODE	aln
+SEQ_TYPE	S
+*************************************************
+

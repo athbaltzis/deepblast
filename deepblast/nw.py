@@ -3,8 +3,9 @@ import torch.nn as nn
 from deepblast.ops import operators
 import numba
 import numpy as np
+import math
 
-use_numba = True
+use_numba = False
 
 
 @numba.njit
@@ -15,15 +16,19 @@ def _soft_max_numba(X):
 
     A = np.empty_like(X)
     S = 0.0
+    print(X)
+    print(M)
     for i in range(3):
         A[i] = np.exp(X[i] - M)
+        print (A[i])
         S += A[i]
 
     for i in range(3):
         A[i] /= S
 
     M += np.log(S)
-
+    #print(M)
+    #print(A)
     return M, A
 
 
@@ -51,6 +56,7 @@ def _forward_pass_numba(theta, A):
     Q[N + 1, M + 1] = 1
     m, x, y = 1, 0, 2
     maxargs = np.empty(3)
+    #print(Q)
     for i in range(1, N + 1):
         for j in range(1, M + 1):
             maxargs[x] = A[i - 1, j - 1] + V[i - 1, j]  # x
@@ -85,6 +91,8 @@ def _forward_pass(theta, A, operator='softmax'):
     if not use_numba or operator != 'softmax':
         operator = operators[operator]
         new = theta.new
+        A = torch.squeeze(A,0)
+        theta = torch.squeeze(theta,0)
         N, M = theta.size()
         V = new(N + 1, M + 1).zero_()     # N x M
         Q = new(N + 2, M + 2, 3).zero_()  # N x M x S
@@ -102,10 +110,13 @@ def _forward_pass(theta, A, operator='softmax'):
         Vt = V[N, M]
     else:
         Vt, Q = _forward_pass_numba(
-            theta.detach().cpu().numpy(),
-            A.detach().cpu().numpy())
+            np.squeeze(theta.detach().cpu().numpy()),
+            np.squeeze(A.detach().cpu().numpy()))
         Vt = torch.tensor(Vt, dtype=theta.dtype)
+        #print(Vt.isnan().any())
         Q = torch.from_numpy(Q)
+        #print(Q.isnan().any())
+
 
     return Vt, Q
 
@@ -125,6 +136,9 @@ def _backward_pass_numba(Et, Q):
             E[i, j] = Q[i + 1, j, x] * E[i + 1, j] + \
                 Q[i + 1, j + 1, m] * E[i + 1, j + 1] + \
                 Q[i, j + 1, y] * E[i, j + 1]
+    array_sum = np.sum(E)
+    array_has_nan = np.isnan(array_sum)
+    #print(array_has_nan)
     return E
 
 
@@ -164,6 +178,8 @@ def _backward_pass(Et, Q):
             Et_float = float(Et)
         E = torch.from_numpy(_backward_pass_numba(
             Et_float, Q.detach().cpu().numpy()))
+        #print(Q.isnan().any())
+
 
     return E
 
@@ -310,6 +326,8 @@ class NeedlemanWunschFunction(torch.autograd.Function):
     @staticmethod
     def forward(ctx, theta, A, operator):
         # Return both the alignment matrix
+        #print(theta.isnan().any())
+        #print(A.isnan().any())
         Vt, Q = _forward_pass(theta, A, operator)
         ctx.save_for_backward(theta, A, Q)
         ctx.others = operator
@@ -339,6 +357,7 @@ class NeedlemanWunschFunctionBackward(torch.autograd.Function):
         E = _backward_pass(Et, Q)
         ctx.save_for_backward(E, Q)
         ctx.others = operator
+        #print(Q.isnan().any())
         return E, A
 
     @staticmethod
@@ -426,6 +445,7 @@ class NeedlemanWunschDecoder(nn.Module):
         with torch.enable_grad():
             # data.requires_grad_()
             nll = self.forward(theta, A)
+            #print(nll.isnan().any())
             v = torch.sum(nll)
             v_grad, _ = torch.autograd.grad(
                 v, (theta, A),

@@ -15,7 +15,7 @@ parser.add_argument("-o","--output", action='store', dest='output', help='Define
 parser.add_argument("-i","--input",action='store',dest='input',required=True, help='Input sequences in fasta format files')
 args = parser.parse_args()
 # Load the pretrained model
-pt_model = '/Users/abaltzis/deepblast/deepblast/pretrained_models/deepblast-lstm4x.pt'
+pt_model = '/tmp/deepblast-lstm4x.pt'
 model = LightningAligner.load_from_checkpoint(pt_model).cpu()
 
 seqs={}

@@ -1,0 +1,7 @@
+***************famsa.tc_method*********
+EXECUTABLE	famsa
+ALN_MODE	pairwise
+OUT_MODE	aln
+SEQ_TYPE	S
+*************************************************
+
